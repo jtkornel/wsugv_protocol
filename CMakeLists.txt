@@ -10,7 +10,8 @@ endif()
 include(r2r_cargo.cmake)
 
 # ros package dependencies
-r2r_cargo(sensor_msgs
+r2r_cargo(std_msgs
+          sensor_msgs
           geometry_msgs
           rcl                    # c ros2 api needed
           rcl_action             # as of r2r 0.1.0, action api needed

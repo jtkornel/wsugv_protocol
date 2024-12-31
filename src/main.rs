@@ -7,7 +7,10 @@ use tokio::io::BufReader;
 use tokio::task;
 use r2r::{QosProfile, Node, Publisher, Clock, ClockType};
 
-use r2r::geometry_msgs::msg::{Quaternion, Vector3};
+use futures::stream::{StreamExt};
+use futures::future;
+
+use r2r::geometry_msgs::msg::{Quaternion, Vector3, Twist};
 use r2r::sensor_msgs::msg::{Imu, JointState};
 use r2r::std_msgs::msg::Header;
 
@@ -81,7 +84,7 @@ fn dispatch_base_data(basedata: BaseInfoData,  imu_publisher: & Publisher<Imu>, 
     joint_publisher.publish(&jmsg).unwrap();
 }
 
-async fn ugv_loop(mut readport: & mut BufReader<SerialStream>, imu_publisher: & Publisher<Imu>, joint_publisher: & Publisher<JointState>)
+async fn ugv_read_loop(mut readport: & mut BufReader<SerialStream>, imu_publisher: & Publisher<Imu>, joint_publisher: & Publisher<JointState>)
 {
     loop {
         let res = read_feedback(& mut readport).await;
@@ -99,21 +102,33 @@ async fn ugv_loop(mut readport: & mut BufReader<SerialStream>, imu_publisher: & 
     }
 }
 
+async fn ugv_write_loop(mut writeport: & mut SerialStream, cmd_vel_subscriber: &  impl StreamExt<Item = Twist>)
+{
+    cmd_vel_subscriber.for_each(|msg| {
+        println!("got new msg: {:?}", msg.linear);
+        future::ready(())
+    }).await;
+}
+
 async fn app() {
 
     let ctx = r2r::Context::create().unwrap();
     let mut node = r2r::Node::create(ctx, "rust_bot", "ugv").unwrap();
 
     let imu_publisher =
-        node.create_publisher::<r2r::sensor_msgs::msg::Imu>("/imu", QosProfile::default()).unwrap();
+        node.create_publisher::<Imu>("/imu", QosProfile::default()).unwrap();
     //let mut timer = node.create_wall_timer(std::time::Duration::from_millis(1000)).unwrap();
 
     let joint_publisher =
-        node.create_publisher::<r2r::sensor_msgs::msg::JointState>("/joint_states", QosProfile::default()).unwrap();
+        node.create_publisher::<JointState>("/joint_states", QosProfile::default()).unwrap();
+
+    let cmd_vel_subscriber =
+        node.subscribe::<Twist>("/cmd_vel", QosProfile::default()).unwrap();
 
     let (mut writeport, mut buf_readport) = construct_ugv_ports("/dev/serial0").await;
 
-    ugv_loop(& mut buf_readport, & imu_publisher, & joint_publisher).await;
+    ugv_read_loop(& mut buf_readport, & imu_publisher, & joint_publisher).await;
+    ugv_write_loop(& mut writeport, & cmd_vel_subscriber).await;
 
     let res = task::spawn_blocking(move ||ros_loop(node)).await;
 

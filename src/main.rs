@@ -19,7 +19,6 @@ fn main() {
     rt.block_on(future);
 }
 
-
 async fn construct_ugv_ports(device: & str) -> (SerialStream, BufReader<SerialStream>) {
     let mut readport = tokio_serial::new(device, 115200).open_native_async().expect("Failed to open port");
     readport.set_exclusive(false).unwrap();
@@ -30,13 +29,6 @@ async fn construct_ugv_ports(device: & str) -> (SerialStream, BufReader<SerialSt
     writeport.write_data_terminal_ready(false).unwrap();
 
     (writeport, buf_readport)
-}
-
-async fn ros_loop(mut node: r2r::Node)
-{
-    loop {
-        node.spin_once(std::time::Duration::from_millis(100));
-    }
 }
 
 fn dispatch_imu_data(imudata: IMUData)
@@ -110,32 +102,41 @@ async fn write_twist(mut writeport: & mut SerialStream, msg: Twist)
 
 async fn ugv_write_loop(mut writeport: & mut SerialStream, mut cmd_vel_subscriber: impl StreamExt<Item = Twist> + std::marker::Unpin)
 {
-    while let Some(message) = cmd_vel_subscriber.next().await {
-        write_twist(& mut writeport, message).await;
-    }
+    loop {
+		match cmd_vel_subscriber.next().await {
+			Some(message) => {
+				write_twist(& mut writeport, message).await;
+			}
+			None => break,
+		}
+	}
 }
 
 async fn app() {
 
     let ctx = r2r::Context::create().unwrap();
-    let mut node = r2r::Node::create(ctx, "rust_bot", "ugv").unwrap();
+    let mut node = r2r::Node::create(ctx, "rust_bot", "").unwrap();
 
-    let imu_publisher =
-        node.create_publisher::<Imu>("/imu", QosProfile::default()).unwrap();
-    //let mut timer = node.create_wall_timer(std::time::Duration::from_millis(1000)).unwrap();
-
-    let joint_publisher =
-        node.create_publisher::<JointState>("/joint_states", QosProfile::default()).unwrap();
+	let imu_publisher =
+		node.create_publisher::<Imu>("/imu", QosProfile::default()).unwrap();
+	let joint_publisher =
+		node.create_publisher::<JointState>("/joint_states", QosProfile::default()).unwrap();	
 
     let cmd_vel_subscriber =
         node.subscribe::<Twist>("/cmd_vel", QosProfile::default()).unwrap();
 
+	println!("Subscriptions done, opening ports");
+
     let (mut writeport, mut buf_readport) = construct_ugv_ports("/dev/serial0").await;
 
-    ugv_read_loop(& mut buf_readport, & imu_publisher, & joint_publisher).await;
-    ugv_write_loop(& mut writeport, cmd_vel_subscriber).await;
+    task::spawn( async move { ugv_write_loop(& mut writeport, cmd_vel_subscriber).await }); 
+    
+    let res = task::spawn_blocking(move ||    loop {
+        node.spin_once(std::time::Duration::from_millis(100));
+    });
 
-    let res = task::spawn_blocking(move ||ros_loop(node)).await;
+	
+	ugv_read_loop(& mut buf_readport, & imu_publisher, & joint_publisher).await;
 
-    res.unwrap().await;
+    res.await.unwrap()
 }

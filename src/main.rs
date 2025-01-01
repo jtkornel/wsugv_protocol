@@ -5,10 +5,9 @@ use ws_ugv_protocol::*;
 use tokio_serial::{SerialPort, SerialPortBuilderExt, SerialStream};
 use tokio::io::BufReader;
 use tokio::task;
-use r2r::{QosProfile, Node, Publisher, Clock, ClockType};
+use r2r::{Clock, ClockType, Publisher, QosProfile};
 
-use futures::stream::{StreamExt};
-use futures::future;
+use futures::stream::StreamExt;
 
 use r2r::geometry_msgs::msg::{Quaternion, Vector3, Twist};
 use r2r::sensor_msgs::msg::{Imu, JointState};
@@ -102,12 +101,18 @@ async fn ugv_read_loop(mut readport: & mut BufReader<SerialStream>, imu_publishe
     }
 }
 
-async fn ugv_write_loop(mut writeport: & mut SerialStream, cmd_vel_subscriber: &  impl StreamExt<Item = Twist>)
+async fn write_twist(mut writeport: & mut SerialStream, msg: Twist)
 {
-    cmd_vel_subscriber.for_each(|msg| {
-        println!("got new msg: {:?}", msg.linear);
-        future::ready(())
-    }).await;
+    let tx_object = CommandMessage::RosCtrl(RosCtrlArgs {x: msg.linear.x as f32, z: msg.angular.z as f32});
+    write_command(&mut writeport, tx_object).await.unwrap();
+}
+
+
+async fn ugv_write_loop(mut writeport: & mut SerialStream, mut cmd_vel_subscriber: impl StreamExt<Item = Twist> + std::marker::Unpin)
+{
+    while let Some(message) = cmd_vel_subscriber.next().await {
+        write_twist(& mut writeport, message).await;
+    }
 }
 
 async fn app() {
@@ -128,7 +133,7 @@ async fn app() {
     let (mut writeport, mut buf_readport) = construct_ugv_ports("/dev/serial0").await;
 
     ugv_read_loop(& mut buf_readport, & imu_publisher, & joint_publisher).await;
-    ugv_write_loop(& mut writeport, & cmd_vel_subscriber).await;
+    ugv_write_loop(& mut writeport, cmd_vel_subscriber).await;
 
     let res = task::spawn_blocking(move ||ros_loop(node)).await;
 

@@ -1,6 +1,6 @@
 
-use ws_ugv_protocol::messages::*;
-use ws_ugv_protocol::*;
+use wsugv_protocol::messages::*;
+use wsugv_protocol::*;
 
 use tokio_serial::{SerialPort, SerialPortBuilderExt, SerialStream};
 use tokio::io::BufReader;
@@ -41,6 +41,10 @@ fn dispatch_imu_offset(imudata: IMUOffsetData)
 
 }
 
+fn dispatch_bus_servos_error(errordata: BusServosErrorData)
+{
+
+}
 
 fn dispatch_base_data(basedata: BaseInfoData,  imu_publisher: & Publisher<Imu>, joint_publisher: & Publisher<JointState>)
 {
@@ -84,11 +88,11 @@ async fn ugv_read_loop(mut readport: & mut BufReader<SerialStream>, imu_publishe
             println!("Error {:?}", res);
             continue
         }
-
         match res.unwrap() {
             FeedbackMessage::IMU(imudata) => dispatch_imu_data(imudata),
             FeedbackMessage::BaseInfo(basedata) => dispatch_base_data(basedata, &imu_publisher, & joint_publisher),
-            FeedbackMessage::IMUOffset(imuoffset) => dispatch_imu_offset(imuoffset)
+            FeedbackMessage::IMUOffset(imuoffset) => dispatch_imu_offset(imuoffset),
+            FeedbackMessage::BusServosError(errordata) => dispatch_bus_servos_error(errordata)
         };
     }
 }
@@ -120,7 +124,7 @@ async fn app() {
     let imu_publisher =
             node.create_publisher::<Imu>("/imu", QosProfile::default()).unwrap();
     let joint_publisher =
-            node.create_publisher::<JointState>("/joint_states", QosProfile::default()).unwrap();       
+            node.create_publisher::<JointState>("/joint_states", QosProfile::default()).unwrap();
 
     let cmd_vel_subscriber =
         node.subscribe::<Twist>("/cmd_vel", QosProfile::default()).unwrap();
@@ -129,9 +133,9 @@ async fn app() {
 
     let (mut writeport, mut buf_readport) = construct_ugv_ports("/dev/serial0").await;
 
-    task::spawn( async move { ugv_write_loop(& mut writeport, cmd_vel_subscriber).await }); 
+    task::spawn( async move { ugv_write_loop(& mut writeport, cmd_vel_subscriber).await });
     task::spawn( async move { ugv_read_loop(& mut buf_readport, imu_publisher, joint_publisher).await });
-    
+
     let res = task::spawn_blocking(move ||    loop {
         node.spin_once(std::time::Duration::from_millis(100));
     });

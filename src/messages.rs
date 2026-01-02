@@ -225,11 +225,28 @@ impl IMUOffsetData {
     const TAG: i64 = 129;
 }
 
+
+// bus servos error feedback
+// {"T":1005,"id":1,"status":1}
+
+#[derive(Deserialize, Debug, PartialEq)]
+pub struct BusServosErrorData {
+    pub id: i16, pub status: i16
+}
+
+impl BusServosErrorData
+{
+    const TAG: i64 = 1005;
+}
+
+
+
 #[derive(Debug, PartialEq)]
 pub enum FeedbackMessage {
     BaseInfo(BaseInfoData),
     IMU(IMUData),
-    IMUOffset(IMUOffsetData)
+    IMUOffset(IMUOffsetData),
+    BusServosError(BusServosErrorData)
 }
 
 use serde_json::Value;
@@ -242,6 +259,7 @@ impl<'de> serde::Deserialize<'de> for FeedbackMessage {
             BaseInfoData::TAG => FeedbackMessage::BaseInfo(BaseInfoData::deserialize(value).map_err(de::Error::custom)?),
             IMUData::TAG => FeedbackMessage::IMU(IMUData::deserialize(value).map_err(de::Error::custom)?),
             IMUOffsetData::TAG => FeedbackMessage::IMUOffset(IMUOffsetData::deserialize(value).map_err(de::Error::custom)?),
+            BusServosErrorData::TAG => FeedbackMessage::BusServosError(BusServosErrorData::deserialize(value).map_err(de::Error::custom)?),
             type_ => panic!("unsupported type {:?}", type_),
         })
     }

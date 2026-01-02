@@ -1,5 +1,5 @@
 [package]
-name = "ws_ugv_protocol"
+name = "wsugv_protocol"
 version = "0.1.0"
 edition = "2021"
 

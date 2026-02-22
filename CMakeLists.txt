@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.10)
-project(ws_ugv_protocol)
+project(wsugv_protocol)
 
 find_package(ament_cmake REQUIRED)
 

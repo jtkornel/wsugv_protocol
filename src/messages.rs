@@ -234,8 +234,7 @@ pub struct BusServosErrorData {
     pub id: i16, pub status: i16
 }
 
-impl BusServosErrorData
-{
+impl BusServosErrorData {
     const TAG: i64 = 1005;
 }
 

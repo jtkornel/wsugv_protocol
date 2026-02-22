@@ -231,7 +231,8 @@ impl IMUOffsetData {
 
 #[derive(Deserialize, Debug, PartialEq)]
 pub struct BusServosErrorData {
-    pub id: i16, pub status: i16
+    pub id: i16,
+    pub status: i16
 }
 
 impl BusServosErrorData {

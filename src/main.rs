@@ -100,7 +100,9 @@ async fn ugv_read_loop(mut readport: & mut BufReader<SerialStream>, imu_publishe
 async fn write_twist(mut writeport: & mut SerialStream, msg: Twist)
 {
     let tx_object = CommandMessage::RosCtrl(RosCtrlArgs {x: msg.linear.x as f32, z: msg.angular.z as f32});
-    write_command(&mut writeport, tx_object).await.unwrap();
+    if let Err(e) = write_command(&mut writeport, tx_object).await {
+        eprintln!("Failed to write twist command to UGV: {:?}", e);
+    }
 }
 
 

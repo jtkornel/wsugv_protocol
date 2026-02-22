@@ -43,7 +43,8 @@ fn dispatch_imu_offset(imudata: IMUOffsetData)
 
 fn dispatch_bus_servos_error(errordata: BusServosErrorData)
 {
-
+    // TODO: Handle or log bus servo errors instead of silently ignoring them.
+    let _ = errordata;
 }
 
 fn dispatch_base_data(basedata: BaseInfoData,  imu_publisher: & Publisher<Imu>, joint_publisher: & Publisher<JointState>)

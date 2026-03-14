@@ -5,12 +5,14 @@ use wsugv_protocol::*;
 use tokio_serial::{SerialPort, SerialPortBuilderExt, SerialStream};
 use tokio::io::BufReader;
 use tokio::task;
+use tokio::select;
 use r2r::{Clock, ClockType, Publisher, QosProfile};
 
 use futures::stream::StreamExt;
 
 use r2r::geometry_msgs::msg::{Quaternion, Vector3, Twist};
 use r2r::sensor_msgs::msg::{Imu, JointState};
+use r2r::std_msgs::msg;
 use r2r::std_msgs::msg::Header;
 
 fn main() {
@@ -31,12 +33,12 @@ async fn construct_ugv_ports(device: & str) -> (SerialStream, BufReader<SerialSt
     (writeport, buf_readport)
 }
 
-fn dispatch_imu_data(imudata: IMUData)
+fn dispatch_imu_data(_imudata: IMUData)
 {
 
 }
 
-fn dispatch_imu_offset(imudata: IMUOffsetData)
+fn dispatch_imu_offset(_imudata: IMUOffsetData)
 {
 
 }
@@ -106,15 +108,22 @@ async fn write_twist(mut writeport: & mut SerialStream, msg: Twist)
     }
 }
 
+async fn write_calibrate_imu(mut writeport: & mut SerialStream)
+{
+    let tx_object = CommandMessage::CalibrateIMU;
+    write_command(&mut writeport, tx_object).await.unwrap();
+}
 
-async fn ugv_write_loop(mut writeport: & mut SerialStream, mut cmd_vel_subscriber: impl StreamExt<Item = Twist> + std::marker::Unpin)
+async fn ugv_write_loop(mut writeport: & mut SerialStream, mut cmd_vel_subscriber: impl StreamExt<Item = Twist> + std::marker::Unpin, mut calibrate_imu_subscriber: impl StreamExt<Item = msg::String> + std::marker::Unpin)
 {
     loop {
-        match cmd_vel_subscriber.next().await {
-            Some(message) => {
-                write_twist(& mut writeport, message).await;
-            }
-            None => break,
+        select! {
+            Some(twist) = cmd_vel_subscriber.next() => {
+                write_twist(& mut writeport, twist).await;
+            },
+            Some(_) = calibrate_imu_subscriber.next() => {
+                write_calibrate_imu(& mut writeport).await;
+            },
         }
     }
 }
@@ -132,11 +141,14 @@ async fn app() {
     let cmd_vel_subscriber =
         node.subscribe::<Twist>("/cmd_vel", QosProfile::default()).unwrap();
 
+    let calibrate_imu_subscriber =
+        node.subscribe::<msg::String>("/calibrate_imu", QosProfile::default()).unwrap();
+
     println!("Subscriptions done, opening ports");
 
     let (mut writeport, mut buf_readport) = construct_ugv_ports("/dev/serial0").await;
 
-    task::spawn( async move { ugv_write_loop(& mut writeport, cmd_vel_subscriber).await });
+    task::spawn( async move { ugv_write_loop(& mut writeport, cmd_vel_subscriber, calibrate_imu_subscriber).await });
     task::spawn( async move { ugv_read_loop(& mut buf_readport, imu_publisher, joint_publisher).await });
 
     let res = task::spawn_blocking(move ||    loop {

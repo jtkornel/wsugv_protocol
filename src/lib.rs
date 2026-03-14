@@ -52,7 +52,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_read_feedback() {
-        let rx_object = FeedbackMessage::BaseInfo(BaseInfoData{ l: 0.2, r: 0.6, gx: Some(0.3), gy: Some(0.4), gz: Some(0.0), ax: Some(0.0), ay: Some(0.0), az: Some(0.0), r_angle: 0.0, p_angle: 0.0, y_angle: Some(0.0), q0: Some(1.0), q1: Some(0.0), q2: Some(0.0), q3: Some(0.0), odl: Some(0.0), odr: Some(0.0), v: 11.0, a_b: None, a_s: None, a_e: None, a_t: None, tor_b: None, tor_s: None, tor_e: None, tor_h: None, pan: None, tilt: None});
+        let rx_object = FeedbackMessage::BaseInfo(BaseInfoData{ l: 0.2, r: 0.6, gx: 0.3, gy: 0.4, gz: 0.0, ax: 0.0, ay: 0.0, az: 0.0, r_angle: 0.0, p_angle: 0.0, y_angle: Some(0.0), q0: 1.0, q1: 0.0, q2: 0.0, q3: 0.0, odl: 0.0, odr: 0.0, v: 11.0, a_b: None, a_s: None, a_e: None, a_t: None, tor_b: None, tor_s: None, tor_e: None, tor_h: None, pan: 0.0, tilt: 0.0});
         let rx_message = r#"{"T":1001,"L":0.2,"R":0.6,"gx":0.3,"gy":0.4,"gz":0,"ax":0,"ay":0,"az":0,"r":0,"p":0,"y":0,"q0":1.0, "q1":0, "q2":0, "q3":0,"odl":0,"odr":0,"v":11.0}"#;
 
         let mut comm = create_fake_reader(rx_message);

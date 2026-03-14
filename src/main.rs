@@ -33,12 +33,12 @@ async fn construct_ugv_ports(device: & str) -> (SerialStream, BufReader<SerialSt
     (writeport, buf_readport)
 }
 
-fn dispatch_imu_data(imudata: IMUData)
+fn dispatch_imu_data(_imudata: IMUData)
 {
 
 }
 
-fn dispatch_imu_offset(imudata: IMUOffsetData)
+fn dispatch_imu_offset(_imudata: IMUOffsetData)
 {
 
 }
